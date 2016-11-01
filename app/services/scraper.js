@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const events = require('events');
 const Program = require('../models/program');
+const Channel = require('../models/channel');
 const rp = require('request-promise');
 const moment = require('moment-timezone');
 
@@ -9,200 +10,213 @@ const eventEmitter = new events.EventEmitter();
 // We need finnish localization
 moment.locale('fi');
 
-const channels = ['yle1', 'yle2', 'mtv3', 'nelonen', 'subtv', 'liv', 'jim', 'viisi', 'kutonen', 'fox', 'mtv3ava', 'hero'];
+module.exports = class Scraper {
+    constructor() {
+        Object.assign(this, {
+            descriptions: [],
+            names: [],
+            seasons: [],
+            episodes: [],
+            starts: [],
+            ends: [],
+            allPrograms: [],
+            channels: [],
+        });
 
-const descriptions = [];
-const names = [];
-const seasons = [];
-const episodes = [];
-const starts = [];
-const ends = [];
-const allPrograms = [];
-
-function searchSeasonNumber(description) {
-    const start = description.indexOf('Kausi');
-    let seasonNumber = '-';
-
-    if (description.charAt(start + 7) === ',') {
-        seasonNumber = description.substr(start + 6, 1);
-    } else if (description.charAt(start + 8) === ',') {
-        seasonNumber = description.substr(start + 6, 2);
-    } else if (description.charAt(start + 7) === '.') {
-        seasonNumber = description.substr(start + 6, 1);
-    } else if (description.charAt(start + 8) === '.') {
-        seasonNumber = description.substr(start + 6, 2);
+        Channel.find().select({ name: 1, _id: 0 })
+            .then((channels) => {
+                this.channels = channels.map(channel => channel.name);
+            })
+            .catch((err) => {
+                throw err;
+            });
     }
-    return Number.isNaN(seasonNumber / 1) ? '-' : seasonNumber;
-}
 
-function searchEpisodeNumber(description) {
-    let start = 0;
-    let episodeNumber = '-';
+    searchSeasonNumber(description) {
+        const start = description.indexOf('Kausi');
+        let seasonNumber = '-';
 
-    description = description.toLowerCase();
-
-    if (description.indexOf('jakso') !== -1) {
-        start = description.indexOf('jakso');
-
-        if (description.charAt(start + 7) === '/') {
-            episodeNumber = description.substr(start + 6, 1);
-        } else if (description.charAt(start + 8) === '/') {
-            episodeNumber = description.substr(start + 6, 2);
+        if (description.charAt(start + 7) === ',') {
+            seasonNumber = description.substr(start + 6, 1);
+        } else if (description.charAt(start + 8) === ',') {
+            seasonNumber = description.substr(start + 6, 2);
         } else if (description.charAt(start + 7) === '.') {
-            episodeNumber = description.substr(start + 6, 1);
+            seasonNumber = description.substr(start + 6, 1);
         } else if (description.charAt(start + 8) === '.') {
-            episodeNumber = description.substr(start + 6, 2);
+            seasonNumber = description.substr(start + 6, 2);
         }
-    } else if (description.indexOf('osa') !== -1) {
-        start = description.indexOf('osa');
-
-        if (description.charAt(start + 5) === '.') {
-            episodeNumber = description.substr(start + 4, 1);
-        } else if (description.charAt(start + 6) === '.') {
-            episodeNumber = description.substr(start + 4, 2);
-        } else if (description.indexOf(':') !== -1) {
-            const end = description.indexOf(':');
-            episodeNumber = description.substr(start + 4, end - (start + 4));
-        }
-    } else if (description.indexOf('kausi') !== -1) {
-        start = description.indexOf('kausi');
-
-        if (description.charAt(start + 10) === '/') {
-            episodeNumber = description.substr(start + 9, 1);
-        } else if (description.charAt(start + 11 === '/')) {
-            episodeNumber = description.substr(start + 9, 2);
-        }
+        return Number.isNaN(seasonNumber / 1) ? '-' : seasonNumber;
     }
 
-    return Number.isNaN(episodeNumber / 1) ? '-' : episodeNumber;
-}
+    searchEpisodeNumber(description) {
+        let start = 0;
+        let episodeNumber = '-';
 
-function searchProgramName(summary) {
-    let name = summary;
-    const start = summary.indexOf('(');
+        description = description.toLowerCase();
 
-    if (start !== -1) {
-        name = summary.substr(0, start - 1);
-    }
-    return name;
-}
+        if (description.indexOf('jakso') !== -1) {
+            start = description.indexOf('jakso');
 
-function formatDate(dateString) {
-    return moment(dateString, 'DD/MM/YYYY hh:mm').format();
-}
+            if (description.charAt(start + 7) === '/') {
+                episodeNumber = description.substr(start + 6, 1);
+            } else if (description.charAt(start + 8) === '/') {
+                episodeNumber = description.substr(start + 6, 2);
+            } else if (description.charAt(start + 7) === '.') {
+                episodeNumber = description.substr(start + 6, 1);
+            } else if (description.charAt(start + 8) === '.') {
+                episodeNumber = description.substr(start + 6, 2);
+            }
+        } else if (description.indexOf('osa') !== -1) {
+            start = description.indexOf('osa');
 
-// Gets information for every channel
-function processBaseInformation(body, channelName) {
-    descriptions.length = 0;
-    names.length = 0;
-    seasons.length = 0;
-    episodes.length = 0;
-    starts.length = 0;
-    ends.length = 0;
+            if (description.charAt(start + 5) === '.') {
+                episodeNumber = description.substr(start + 4, 1);
+            } else if (description.charAt(start + 6) === '.') {
+                episodeNumber = description.substr(start + 4, 2);
+            } else if (description.indexOf(':') !== -1) {
+                const end = description.indexOf(':');
+                episodeNumber = description.substr(start + 4, end - (start + 4));
+            }
+        } else if (description.indexOf('kausi') !== -1) {
+            start = description.indexOf('kausi');
 
-    const $ = cheerio.load(body);
-
-    $('._summary').each((i, elem) => {
-        const summary = elem.children[0].data;
-        names[i] = searchProgramName(summary);
-    });
-
-    $('._description').each((i, elem) => {
-        const description = elem.children.length > 0 ? elem.children[0].data : '';
-
-        if (description.length === 0) {
-            descriptions[i] = 'Ei kuvausta saatavilla.';
-            seasons[i] = '-';
-            episodes[i] = '-';
-        } else {
-            descriptions[i] = description;
-            seasons[i] = searchSeasonNumber(description);
-            episodes[i] = searchEpisodeNumber(description);
+            if (description.charAt(start + 10) === '/') {
+                episodeNumber = description.substr(start + 9, 1);
+            } else if (description.charAt(start + 11 === '/')) {
+                episodeNumber = description.substr(start + 9, 2);
+            }
         }
-    });
 
-    $('._start').each((i, elem) => {
-        starts[i] = elem.children.length > 0 ? formatDate(elem.children[0].data) : '';
-    });
+        return Number.isNaN(episodeNumber / 1) ? '-' : episodeNumber;
+    }
 
-    $('._end').each((i, elem) => {
-        ends[i] = elem.children.length > 0 ? formatDate(elem.children[0].data) : '';
-    });
+    searchProgramName(summary) {
+        let name = summary;
+        const start = summary.indexOf('(');
 
-    const programs = [];
+        if (start !== -1) {
+            name = summary.substr(0, start - 1);
+        }
+        return name;
+    }
 
-    // this combines information to JSON
-    for (let i = 0; i < names.length; i += 1) {
-        const name = names[i];
-        const description = descriptions[i];
-        const season = seasons[i];
-        const episode = episodes[i];
-        const start = starts[i];
-        const end = ends[i];
+    formatDate(dateString) {
+        return moment(dateString, 'DD/MM/YYYY hh:mm').format();
+    }
+
+    // Gets information for every channel
+    processBaseInformation(body, channelName) {
+        this.descriptions.length = 0;
+        this.names.length = 0;
+        this.seasons.length = 0;
+        this.episodes.length = 0;
+        this.starts.length = 0;
+        this.ends.length = 0;
+
+        const $ = cheerio.load(body);
+
+        $('._summary').each((i, elem) => {
+            const summary = elem.children[0].data;
+            this.names[i] = this.searchProgramName(summary);
+        });
+
+        $('._description').each((i, elem) => {
+            const description = elem.children.length > 0 ? elem.children[0].data : '';
+
+            if (description.length === 0) {
+                this.descriptions[i] = 'Ei kuvausta saatavilla.';
+                this.seasons[i] = '-';
+                this.episodes[i] = '-';
+            } else {
+                this.descriptions[i] = description;
+                this.seasons[i] = this.searchSeasonNumber(description);
+                this.episodes[i] = this.searchEpisodeNumber(description);
+            }
+        });
+
+        $('._start').each((i, elem) => {
+            this.starts[i] = elem.children.length > 0 ? this.formatDate(elem.children[0].data) : '';
+        });
+
+        $('._end').each((i, elem) => {
+            this.ends[i] = elem.children.length > 0 ? this.formatDate(elem.children[0].data) : '';
+        });
+
+        const programs = [];
+
+        // this combines information to JSON
+        for (let i = 0; i < this.names.length; i += 1) {
+            const name = this.names[i];
+            const description = this.descriptions[i];
+            const season = this.seasons[i];
+            const episode = this.episodes[i];
+            const start = this.starts[i];
+            const end = this.ends[i];
+
+            const temp = {
+                name,
+                description,
+                season,
+                episode,
+                start,
+                end,
+            };
+
+            programs.push(temp);
+
+            const newProgram = new Program({
+                channelName,
+                data: temp,
+            });
+
+            newProgram.save((err) => {
+                if (err) throw err;
+            });
+        }
 
         const temp = {
-            name,
-            description,
-            season,
-            episode,
-            start,
-            end,
+            channelName,
+            data: programs,
         };
 
-        programs.push(temp);
+        this.allPrograms.push(temp);
 
-        const newProgram = new Program({
-            channelName,
-            data: temp,
-        });
-
-        newProgram.save((err) => {
-            if (err) throw err;
-        });
+        if (this.allPrograms.length === this.channels.length) {
+            eventEmitter.emit('base_finished');
+        }
     }
 
-    const temp = {
-        channelName,
-        data: programs,
-    };
+    scrape() {
+        this.allPrograms.length = 0;
+        this.descriptions.length = 0;
+        this.names.length = 0;
+        this.seasons.length = 0;
+        this.episodes.length = 0;
+        this.starts.length = 0;
+        this.ends.length = 0;
 
-    allPrograms.push(temp);
+        Program.remove().exec();
 
-    if (allPrograms.length === channels.length) {
-        eventEmitter.emit('base_finished');
-    }
-}
+        const today = moment().tz('Europe/Helsinki').format('dddd');
 
-function scrape() {
-    allPrograms.length = 0;
-    descriptions.length = 0;
-    names.length = 0;
-    seasons.length = 0;
-    episodes.length = 0;
-    starts.length = 0;
-    ends.length = 0;
+        const promises = [];
 
-    Program.remove().exec();
-
-    const today = moment().tz('Europe/Helsinki').format('dddd');
-
-    const promises = [];
-
-    channels.forEach((channel) => {
-        promises.push(rp(`http://www.telsu.fi/${today}/${channel}`));
-    });
-
-    Promise.all(promises).then((results) => {
-        results.forEach((channel, index) => {
-            processBaseInformation(channel, channels[index]);
+        this.channels.forEach((channel) => {
+            promises.push(rp(`http://www.telsu.fi/${today}/${channel}`));
         });
-    });
-}
 
-module.exports = {
-    searchSeasonNumber,
-    searchEpisodeNumber,
-    searchProgramName,
-    formatDate,
-    scrape,
+        Promise.all(promises).then((results) => {
+            results.forEach((channel, index) => {
+                this.processBaseInformation(channel, this.channels[index]);
+            });
+        });
+    }
 };
+
+// module.exports = {
+//     searchSeasonNumber,
+//     searchEpisodeNumber,
+//     searchProgramName,
+//     formatDate,
+//     scrape,
+// };

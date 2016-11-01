@@ -4,8 +4,10 @@ const express = require('express');
 const config = require('./config/config');
 const glob = require('glob');
 const mongoose = require('mongoose');
-const { scrape } = require('./app/services/scraper');
 const cron = require('cron');
+const Scraper = require('./app/services/scraper');
+
+const ScraperService = new Scraper();
 
 const db = mongoose.connection;
 db.on('error', () => {
@@ -26,10 +28,10 @@ app.listen(config.port, config.ip_address, () => {
 });
 
 const cronJob = cron.job('0 */30 * * * *', () => {
-    scrape();
+    ScraperService.scrape();
 });
 cronJob.start();
 
-scrape();
+ScraperService.scrape();
 
 module.exports = app;
