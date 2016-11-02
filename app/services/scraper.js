@@ -145,7 +145,8 @@ module.exports = class Scraper {
         const programs = [];
 
         // this combines information to JSON
-        for (let i = 0; i < this.names.length; i += 1) {
+        const length = this.names.length;
+        for (let i = 0; i < length; i += 1) {
             const name = this.names[i];
             const description = this.descriptions[i];
             const season = this.seasons[i];
@@ -153,7 +154,7 @@ module.exports = class Scraper {
             const start = this.starts[i];
             const end = this.ends[i];
 
-            const temp = {
+            const program = {
                 name,
                 description,
                 season,
@@ -162,11 +163,11 @@ module.exports = class Scraper {
                 end,
             };
 
-            programs.push(temp);
+            programs.push(program);
 
             const newProgram = new Program({
                 channelName,
-                data: temp,
+                data: program,
             });
 
             newProgram.save((err) => {
@@ -199,11 +200,7 @@ module.exports = class Scraper {
 
         const today = moment().tz('Europe/Helsinki').format('dddd');
 
-        const promises = [];
-
-        this.channels.forEach((channel) => {
-            promises.push(rp(`http://www.telsu.fi/${today}/${channel}`));
-        });
+        const promises = this.channels.map(channel => rp(`http://www.telsu.fi/${today}/${channel}`));
 
         Promise.all(promises).then((results) => {
             results.forEach((channel, index) => {
@@ -212,11 +209,3 @@ module.exports = class Scraper {
         });
     }
 };
-
-// module.exports = {
-//     searchSeasonNumber,
-//     searchEpisodeNumber,
-//     searchProgramName,
-//     formatDate,
-//     scrape,
-// };

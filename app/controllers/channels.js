@@ -23,7 +23,7 @@ module.exports = (app) => {
 };
 
 router.get('/api/channels', (req, res, next) => {
-    Channel.find().select({ name: 1, _id: 0 })
+    Channel.find().select({ name: 1, _id: 0 }).sort()
         .then(channels => res.status(200).json(channels.map(channel => channel.name)))
         .catch(err => next(err));
 });
@@ -47,7 +47,6 @@ router.delete('/api/channels/:name', (req, res, next) => {
 
     Channel.remove({ name })
         .then((result) => {
-            // TODO: find out better way to detect when actually removed
             if (_.get(result, 'result.n') === 1) {
                 return res.json({ message: 'Deleted' });
             }

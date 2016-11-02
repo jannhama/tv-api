@@ -32,6 +32,4 @@ const cronJob = cron.job('0 */30 * * * *', () => {
 });
 cronJob.start();
 
-ScraperService.scrape();
-
 module.exports = app;
