@@ -1,9 +1,6 @@
-const {
-    searchSeasonNumber,
-    searchEpisodeNumber,
-    searchProgramName,
-    formatDate,
-} = require('../../app/services/scraper');
+const Scraper = require('../../app/services/scraper');
+
+const ScraperService = new Scraper();
 
 describe('scraper', () => {
     describe('searchSeasonNumber', () => {
@@ -15,7 +12,7 @@ describe('scraper', () => {
                 'Kausi 2,',
             ];
             descriptions.forEach((description) => {
-                searchSeasonNumber(description).should.equal('2');
+                ScraperService.searchSeasonNumber(description).should.equal('2');
             });
             done();
         });
@@ -28,14 +25,14 @@ describe('scraper', () => {
                 'Kausi 10,',
             ];
             descriptions.forEach((description) => {
-                searchSeasonNumber(description).should.equal('10');
+                ScraperService.searchSeasonNumber(description).should.equal('10');
             });
             done();
         });
 
         it('should return "-" when season number can not be found from the given string', (done) => {
             const description = 'Almanakan piilotus';
-            searchSeasonNumber(description).should.equal('-');
+            ScraperService.searchSeasonNumber(description).should.equal('-');
             done();
         });
     });
@@ -54,7 +51,7 @@ describe('scraper', () => {
                 'osa 1.',
             ];
             descriptions.forEach((description) => {
-                searchEpisodeNumber(description).should.equal('1');
+                ScraperService.searchEpisodeNumber(description).should.equal('1');
             });
             done();
         });
@@ -71,20 +68,20 @@ describe('scraper', () => {
                 'osa 10.',
             ];
             descriptions.forEach((description) => {
-                searchEpisodeNumber(description).should.equal('10');
+                ScraperService.searchEpisodeNumber(description).should.equal('10');
             });
             done();
         });
 
         it('should find episode number from a string that has "osa" and ":" characters', (done) => {
             const description = 'Osa 3070: Akin unet';
-            searchEpisodeNumber(description).should.equal('3070');
+            ScraperService.searchEpisodeNumber(description).should.equal('3070');
             done();
         });
 
         it('should return "-" when episode number can not be found from the given string', (done) => {
             const description = 'Akin unet';
-            searchEpisodeNumber(description).should.equal('-');
+            ScraperService.searchEpisodeNumber(description).should.equal('-');
             done();
         });
     });
@@ -96,7 +93,7 @@ describe('scraper', () => {
                 'Eurojackpot, Jokeri ja Lomatonni',
             ];
             summaries.forEach((summary) => {
-                searchProgramName(summary).should.equal('Eurojackpot, Jokeri ja Lomatonni');
+                ScraperService.searchProgramName(summary).should.equal('Eurojackpot, Jokeri ja Lomatonni');
             });
             done();
         });
@@ -104,12 +101,12 @@ describe('scraper', () => {
 
     describe('formatDate', () => {
         xit('should return formatted date when invoked with expected date string', (done) => {
-            formatDate('29/10/2016 01:25').should.equal('2016-10-29T01:25:00+03:00');
+            ScraperService.formatDate('29/10/2016 01:25').should.equal('2016-10-29T01:25:00+03:00');
             done();
         });
 
         it('should return "Invalid date" when invoked with invalid date string', (done) => {
-            formatDate('asd').should.equal('Invalid date');
+            ScraperService.formatDate('asd').should.equal('Invalid date');
             done();
         });
     });
