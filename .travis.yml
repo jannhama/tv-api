@@ -12,3 +12,6 @@ deploy:
   domain: mashupjonne
   on:
     repo: joonne/tv-api
+branches:
+  only:
+  - master
